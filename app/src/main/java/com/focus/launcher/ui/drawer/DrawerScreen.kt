@@ -1,22 +1,17 @@
 package com.focus.launcher.ui.drawer
 
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -24,11 +19,13 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.item
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,16 +34,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -64,7 +59,6 @@ import com.focus.launcher.ui.components.Label
 import com.focus.launcher.ui.components.T
 import com.focus.launcher.ui.components.TabChip
 import com.focus.launcher.ui.components.VSpace
-import com.focus.launcher.ui.components.WorkBadge
 import com.focus.launcher.ui.components.focusTextStyle
 import com.focus.launcher.ui.components.hasColourGlyphs
 import com.focus.launcher.ui.components.monochrome
@@ -73,17 +67,16 @@ import com.focus.launcher.ui.theme.LocalFocusColors
 import com.focus.launcher.util.formatDuration
 import com.focus.launcher.util.formatMinutes
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.Normalizer
 
 private const val DAY_MS = 86_400_000L
 
 /**
- * Page two of the launcher: a search bar, the apps installed in the last 24 hours, and every app
- * as a plain list. With a work profile the list splits into Personal / Work tabs; "Sort" orders it
- * A–Z, by most used or by last used. Search always covers both profiles. No icons anywhere.
- * Long-press a row for its menu.
+ * Page two of the launcher: a search bar and every app in a compact grid.
+ * With a work profile the list splits into Personal / Work tabs; "Sort" orders it A–Z, by most
+ * used or by last used. Search always covers both profiles.
+ * Long-press a tile for its menu.
  */
 @Composable
 fun DrawerScreen(
@@ -105,8 +98,7 @@ fun DrawerScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val searchFocus = remember { FocusRequester() }
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
+    val gridState = rememberLazyGridState()
 
     val visible = remember(apps, settings.hidden) { apps.filter { it.key !in settings.hidden } }
     // Stripping accents is the expensive part of search; do it once per list, not per keystroke.
@@ -126,9 +118,9 @@ fun DrawerScreen(
     // package -> (foreground ms over the last week, last time used). Only read when a sort needs it.
     var stats by remember { mutableStateOf<Map<String, Pair<Long, Long>>>(emptyMap()) }
     // Scrolling through the list is browsing, not typing: give the keyboard's half of the screen back.
-    val listDragged by listState.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(listDragged) {
-        if (listDragged) {
+    val gridDragged by gridState.interactionSource.collectIsDraggedAsState()
+    LaunchedEffect(gridDragged) {
+        if (gridDragged) {
             focusManager.clearFocus()
             keyboard?.hide()
         }
@@ -157,11 +149,8 @@ fun DrawerScreen(
                 .sortedByDescending { it.firstInstallTime }
         }
     }
-    // Number of list items that come before the alphabetical block (section labels + recent apps).
-    val leadingItems = if (!searching && recent.isNotEmpty()) recent.size + 2 else 0
-    // Letters only mean something in an alphabetical list.
-    val letters = remember(sorted, sort, leadingItems) {
-        if (sort == DrawerSort.ALPHA) letterIndex(sorted, leadingItems) else emptyList()
+    val rest = remember(results, recent, searching) {
+        if (searching || recent.isEmpty()) results else results.filterNot { app -> recent.any { it.key == app.key } }
     }
 
     // The keyboard only ever opens on purpose: by the "open right away" setting, by swiping up on
@@ -176,8 +165,8 @@ fun DrawerScreen(
             keyboard?.hide()
         }
     }
-    // stats is a key too: when it arrives the list reorders, and a keyed list would follow the old top row.
-    LaunchedEffect(query, workTab, sort, stats) { listState.scrollToItem(0) }
+    // stats is a key too: when it arrives the grid reorders, and a keyed list would follow the old top row.
+    LaunchedEffect(query, workTab, sort, stats) { gridState.scrollToItem(0) }
     // Optional: open the app as soon as the search narrows down to exactly one.
     LaunchedEffect(results, query) {
         if (settings.autoLaunch && isActive && query.trim().length >= 2 && results.size == 1) onLaunch(results[0])
@@ -245,91 +234,41 @@ fun DrawerScreen(
             T(hint, Modifier.padding(horizontal = 24.dp, vertical = 6.dp).border(1.dp, c.fg, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 9.dp), size = 15.sp, lineHeight = 21.sp)
         }
 
-        var scrubbing by remember { mutableStateOf<Char?>(null) }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val showIndex = !searching && sort == DrawerSort.ALPHA && letters.size > 5 && maxHeight > (letters.size * 15).dp
-
-            LazyColumn(Modifier.fillMaxSize(), state = listState) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 106.dp),
+                state = gridState,
+                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
                 if (!searching && recent.isNotEmpty()) {
-                    item(key = "label:recent") { SectionLabel("Installed in the last 24 hours") }
+                    item(key = "label:recent", span = { GridItemSpan(maxLineSpan) }) { SectionLabel("Installed in the last 24 hours") }
                     items(recent, key = { "recent:" + it.key }) { app ->
-                        AppRow(app, settings, today, showIndex, onLaunch, onAppMenu)
+                        AppTile(app, settings, today, onLaunch, onAppMenu)
                     }
-                    item(key = "label:all") { SectionLabel("All apps", top = 22) }
-                }
-                items(results, key = { it.key }) { app ->
-                    AppRow(app, settings, today, showIndex, onLaunch, onAppMenu)
+                    item(key = "label:all", span = { GridItemSpan(maxLineSpan) }) { SectionLabel("All apps", top = 16) }
+                    items(rest, key = { "all:" + it.key }) { app ->
+                        AppTile(app, settings, today, onLaunch, onAppMenu)
+                    }
+                } else {
+                    items(results, key = { it.key }) { app ->
+                        AppTile(app, settings, today, onLaunch, onAppMenu)
+                    }
                 }
                 if (results.isEmpty()) {
-                    item(key = "empty") {
+                    item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                         T(
                             if (!loaded) "Loading…" else if (searching) "No app matches “${query.trim()}”" else "No apps",
-                            Modifier.padding(horizontal = 30.dp, vertical = 20.dp), size = 16.sp, color = c.dim,
+                            Modifier.padding(horizontal = 12.dp, vertical = 18.dp), size = 16.sp, color = c.dim,
                         )
                     }
                 }
-                item(key = "inset") {
+                item(key = "inset", span = { GridItemSpan(maxLineSpan) }) {
                     Column {
                         VSpace(24.dp)
                         Box(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
                     }
-                }
-            }
-
-            // A–Z scrubber on the right edge
-            if (showIndex) {
-                Column(
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                        .width(34.dp)
-                        .padding(vertical = 6.dp)
-                        .pointerInput(letters) {
-                            awaitEachGesture {
-                                fun jump(y: Float) {
-                                    val i = (y / size.height * letters.size).toInt().coerceIn(0, letters.lastIndex)
-                                    val (letter, index) = letters[i]
-                                    if (scrubbing != letter) {
-                                        scrubbing = letter
-                                        scope.launch { listState.scrollToItem(index) }
-                                    }
-                                }
-                                val down = awaitFirstDown()
-                                down.consume()
-                                jump(down.position.y)
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                    if (!change.pressed) break
-                                    change.consume()
-                                    jump(change.position.y)
-                                }
-                                scrubbing = null
-                            }
-                        },
-                    verticalArrangement = Arrangement.SpaceEvenly,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    for ((letter, _) in letters) {
-                        T(
-                            letter.toString(), size = 10.sp,
-                            color = if (scrubbing == letter) c.fg else c.faint,
-                            weight = if (scrubbing == letter) FontWeight.Bold else FontWeight.Normal,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-
-            var shownLetter by remember { mutableStateOf('A') }
-            scrubbing?.let { shownLetter = it }
-            val overlay by animateFloatAsState(if (scrubbing != null) 1f else 0f, tween(if (scrubbing != null) 90 else 260), label = "scrub")
-            if (overlay > 0.01f) {
-                Box(
-                    Modifier.align(Alignment.Center).graphicsLayer { alpha = overlay }.size(92.dp).background(c.bg).border(1.dp, c.dim),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    T(shownLetter.toString(), size = 44.sp, weight = FontWeight.Light)
                 }
             }
         }
@@ -348,11 +287,10 @@ private fun SectionLabel(text: String, top: Int = 10) {
 }
 
 @Composable
-private fun AppRow(
+private fun AppTile(
     app: AppEntry,
     settings: Settings,
     today: DayUsage?,
-    indexShown: Boolean,
     onLaunch: (AppEntry) -> Unit,
     onAppMenu: (AppEntry) -> Unit,
 ) {
@@ -363,19 +301,43 @@ private fun AppRow(
     val used = today?.perApp?.get(app.packageName) ?: 0L
     val spent = limit != null && used >= limit.millis && !Graph.limits.hasFreePass(app.packageName)
 
-    Row(
+    Column(
         Modifier
-            .fillMaxWidth()
             .press(onLongClick = { onAppMenu(app) }) { onLaunch(app) }
-            .padding(start = 30.dp, end = if (indexShown) 42.dp else 30.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        val name = if (hasColourGlyphs(app.label)) Modifier.weight(1f).monochrome() else Modifier.weight(1f)
-        T(app.label, name, size = 20.sp, color = if (spent) c.faint else c.fg, maxLines = 1)
-        if (app.isWorkProfile) WorkBadge()
+        MinimalIcon(label = app.label, dimmed = spent)
+        val name = if (hasColourGlyphs(app.label)) Modifier.fillMaxWidth().monochrome() else Modifier.fillMaxWidth()
+        T(app.label, name, size = 14.sp, color = if (spent) c.faint else c.fg, maxLines = 1, align = androidx.compose.ui.text.style.TextAlign.Center)
+        if (app.isWorkProfile) T("Work", size = 11.sp, color = c.dim, maxLines = 1)
         if (limit != null && settings.showUsageInDrawer) {
-            T("${formatDuration(used)} / ${formatMinutes(limit.minutes)}", size = 13.sp, color = if (spent) c.faint else c.dim, maxLines = 1)
+            T("${formatDuration(used)} / ${formatMinutes(limit.minutes)}", size = 11.sp, color = if (spent) c.faint else c.dim, maxLines = 1, align = androidx.compose.ui.text.style.TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun MinimalIcon(label: String, dimmed: Boolean) {
+    val c = LocalFocusColors.current
+    val text = normalize(label).firstOrNull()?.uppercaseChar()?.toString() ?: "·"
+    Box(
+        Modifier
+            .size(46.dp)
+            .border(1.dp, if (dimmed) c.line else c.dim, RoundedCornerShape(12.dp))
+            .background(c.bg, RoundedCornerShape(12.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        T(text, size = 20.sp, color = if (dimmed) c.faint else c.fg, weight = FontWeight.Medium, maxLines = 1)
+        Canvas(Modifier.fillMaxSize()) {
+            drawLine(
+                color = if (dimmed) c.line else c.faint,
+                start = Offset(size.width * 0.22f, size.height * 0.78f),
+                end = Offset(size.width * 0.78f, size.height * 0.78f),
+                strokeWidth = 1f,
+            )
         }
     }
 }
@@ -416,19 +378,4 @@ private fun isSubsequence(needle: String, haystack: String): Boolean {
     var i = 0
     for (ch in haystack) if (i < needle.length && ch == needle[i]) i++
     return i == needle.length
-}
-
-/** First list position of every initial letter, in list order ('#' collects everything else). */
-private fun letterIndex(apps: List<AppEntry>, offset: Int): List<Pair<Char, Int>> {
-    val out = ArrayList<Pair<Char, Int>>()
-    var last: Char? = null
-    apps.forEachIndexed { i, app ->
-        val first = normalize(app.label).firstOrNull()?.uppercaseChar()
-        val letter = if (first != null && first in 'A'..'Z') first else '#'
-        if (letter != last) {
-            if (out.none { it.first == letter }) out += letter to (i + offset)
-            last = letter
-        }
-    }
-    return out
 }

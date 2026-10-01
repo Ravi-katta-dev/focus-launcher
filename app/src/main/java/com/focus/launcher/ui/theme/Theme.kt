@@ -1,6 +1,9 @@
 package com.focus.launcher.ui.theme
 
 import android.os.Build
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
@@ -10,21 +13,29 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toDrawable
@@ -33,8 +44,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.focus.launcher.data.FontChoice
 import com.focus.launcher.data.Settings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The whole palette: one background, one foreground, and three greys between them. */
 @Immutable
@@ -75,6 +88,7 @@ val LocalTextScale = staticCompositionLocalOf { 1f }
 @Composable
 fun FocusTheme(settings: Settings, content: @Composable () -> Unit) {
     val colors = if (settings.dark) BlackTheme else WhiteTheme
+    val wallpaper = rememberWallpaper(settings.wallpaperUri)
     val font = when (settings.font) {
         FontChoice.SANS -> FontFamily.Default
         FontChoice.SERIF -> FontFamily.Serif
@@ -86,8 +100,55 @@ fun FocusTheme(settings: Settings, content: @Composable () -> Unit) {
         LocalTextScale provides settings.textScale,
         LocalIndication provides PressIndication,
     ) {
-        Box(Modifier.fillMaxSize().background(colors.bg)) { content() }
+        Box(Modifier.fillMaxSize()) {
+            if (wallpaper != null) {
+                Image(
+                    bitmap = wallpaper,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                )
+                Box(Modifier.fillMaxSize().background(colors.bg.copy(alpha = 0.74f)))
+            } else {
+                Box(Modifier.fillMaxSize().background(colors.bg))
+            }
+            content()
+        }
     }
+}
+
+@Composable
+private fun rememberWallpaper(uriText: String) = run {
+    val context = LocalContext.current
+    val config = LocalConfiguration.current
+    val density = LocalDensity.current
+    val widthPx = with(density) { config.screenWidthDp.dp.roundToPx() }.coerceAtLeast(1)
+    val heightPx = with(density) { config.screenHeightDp.dp.roundToPx() }.coerceAtLeast(1)
+    val uri = uriText.takeIf { it.isNotBlank() }?.let(Uri::parse)
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(initialValue = null, uri, widthPx, heightPx) {
+        value = if (uri == null) null else withContext(Dispatchers.IO) { decodeWallpaper(context, uri, widthPx, heightPx) }
+    }
+    bitmap
+}
+
+private fun decodeWallpaper(context: android.content.Context, uri: Uri, targetW: Int, targetH: Int): androidx.compose.ui.graphics.ImageBitmap? {
+    val resolver = context.contentResolver
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return null
+    val sample = computeSampleSize(bounds.outWidth, bounds.outHeight, targetW, targetH)
+    val opts = BitmapFactory.Options().apply {
+        inSampleSize = sample
+        inPreferredConfig = Bitmap.Config.RGB_565
+    }
+    val decoded = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
+    return decoded.asImageBitmap()
+}
+
+private fun computeSampleSize(srcW: Int, srcH: Int, targetW: Int, targetH: Int): Int {
+    var sample = 1
+    if (srcW <= 0 || srcH <= 0) return sample
+    while (srcW / (sample * 2) >= targetW && srcH / (sample * 2) >= targetH) sample *= 2
+    return sample.coerceAtLeast(1)
 }
 
 /** Transparent bars over a black (or white) window, and the optional hidden status bar. */

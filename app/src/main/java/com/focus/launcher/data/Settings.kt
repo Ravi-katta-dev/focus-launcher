@@ -49,6 +49,8 @@ const val TAP_NOTHING = "tap:none"
 data class Settings(
     // Appearance
     val dark: Boolean = true,
+    /** Imported from system files; blank means solid black/white background only. */
+    val wallpaperUri: String = "",
     val font: FontChoice = FontChoice.SANS,
     val textScale: Float = 1f,
     val hideStatusBar: Boolean = false,
@@ -133,6 +135,7 @@ data class Settings(
     fun toJson(): JSONObject = JSONObject().apply {
         put("v", SCHEMA)
         put("dark", dark)
+        put("wallpaperUri", wallpaperUri)
         put("font", font.name)
         put("textScale", textScale.toDouble())
         put("hideStatusBar", hideStatusBar)
@@ -199,6 +202,7 @@ data class Settings(
             val d = Settings()
             return Settings(
                 dark = o.optBoolean("dark", d.dark),
+                wallpaperUri = o.optString("wallpaperUri", d.wallpaperUri),
                 font = enumOr(o.optString("font"), d.font),
                 textScale = o.optDouble("textScale", d.textScale.toDouble()).toFloat().coerceIn(0.8f, 1.4f),
                 hideStatusBar = o.optBoolean("hideStatusBar", d.hideStatusBar),
