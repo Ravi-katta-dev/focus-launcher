@@ -817,3 +817,16 @@ td, th, figcaption, h2, summary`, the facts and the footer outside `.phone`:
 **Lesson kept:** he stopped a tool call that was only waiting for CI. Do not block a turn on a
 CI run he did not ask to wait for; start what he asked for and check CI afterwards.
 
+## 2026-10-02 · Durable wallpaper import and four-column drawer
+
+**Asked:** wallpaper was imported but did not work; plan the fix and make the app drawer four
+columns instead of three.
+**Done:** selected images are copied from the document provider into app-private storage before
+their local file URI is saved in settings, so rendering no longer depends on a provider's
+persisted URI permission. Replacing an image uses a temporary file; removing the wallpaper
+deletes the imported copy. The drawer now uses a fixed four-column Compose grid.
+**Verified:** editor diagnostics report no errors in both changed Kotlin files. Gradle compilation
+was attempted but the container only has JDK 25; this project requires JDK 17 and no compatible
+JDK is installed here. Device behavior and the final build remain open until a JDK 17 environment
+is available.
+

@@ -235,7 +235,7 @@ fun DrawerScreen(
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 106.dp),
+                columns = GridCells.Fixed(4),
                 state = gridState,
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),

@@ -86,6 +86,10 @@ Launched with `launchOptions()` like any app. Deliberately not a hosted AppWidge
 put colour and icons on the home screen. Finger-left is still the drawer.
 
 ## Drawer details
+The app grid uses `GridCells.Fixed(4)`, so the drawer always presents four columns rather than
+varying the count with screen width. Imported wallpapers are copied from the document provider
+into app-private storage before the local file URI is saved in settings; removal deletes that copy.
+
 The search field is composed even while the home page shows (pager keeps both pages), so it takes
 `focusProperties { canFocus = isActive }` and the window is `stateAlwaysHidden`: otherwise it
 grabs initial focus and pops the keyboard.

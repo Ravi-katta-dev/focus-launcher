@@ -31,7 +31,7 @@ ui/     theme/ components/ home/ drawer/ block/ review/ settings/   + Launching.
 | Clock: split (default), ring (battery or day) or plain; tap/long-press action | `ui/home/HomeWidgets.kt` `HomeClock`, `ClockTapDialog.kt` |
 | Screen time on home: title + total + "N% of today" (of 24 h) below the clock, outside the ring, no setting; tap → review (the 24-hour bar was removed from home; `DayBar` lives on in the review) | `HomeWidgets.kt` `ScreenTimeLine`; height counted in `HomeScreen` `heightOf` |
 | Home layout that always fits | `ui/home/HomeScreen.kt` (`Fit` options, measured constants) |
-| Drawer: search ranking, recent installs, A–Z scrubber | `ui/drawer/DrawerScreen.kt` |
+| Drawer: search ranking, recent installs, A–Z scrubber, fixed four-column grid | `ui/drawer/DrawerScreen.kt` |
 | Drawer sort (A–Z / Most used / Recent), "Sort: …" under the search bar | `DrawerScreen.kt`, `Settings.drawerSort` (`DrawerSort`), `UsageRepository.sortStats()` |
 | Drawer Personal / Work tabs (only with a work profile) | `DrawerScreen.kt`, `TabChip` in `ui/components/Basics.kt` |
 | Work marker: drawn briefcase outline (`WorkBadge`) on drawer rows and pinned work apps | `ui/components/Basics.kt`, `DrawerScreen.kt`, `ui/home/HomeScreen.kt` |
@@ -48,7 +48,7 @@ ui/     theme/ components/ home/ drawer/ block/ review/ settings/   + Launching.
 | Launch gate (wall / consent before an app opens) | `ui/Launching.kt` `launchApp`, `start`, `launchOptions` |
 | Wall + consent UI | `ui/block/BlockScreen.kt`, `BlockActivity.kt` |
 | Settings pages (12 routes) | `ui/settings/*` ; routes: main setup home fastapps drawer hidden timers timerapps weekly appearance gestures about |
-| Theme, light-up press feedback, edge-to-edge, refresh rate | `ui/theme/Theme.kt` |
+| Theme, imported wallpaper, light-up press feedback, edge-to-edge, refresh rate | `ui/theme/Theme.kt`, `ui/settings/LauncherPages.kt` |
 
 ## Things that are easy to get wrong
 - **Timers work in two layers.** The launcher's gate needs only usage access. Mid-session locking

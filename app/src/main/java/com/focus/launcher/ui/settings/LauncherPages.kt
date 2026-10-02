@@ -50,6 +50,10 @@ import com.focus.launcher.ui.home.clockTapLabel
 import com.focus.launcher.ui.home.shortcutLabel
 import com.focus.launcher.ui.launchApp
 import com.focus.launcher.ui.theme.LocalFocusColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
 
 private fun update(transform: (Settings) -> Settings) = Graph.settings.update(transform)
 
@@ -323,15 +327,15 @@ private val TEXT_SIZES = listOf(0.9f to "Small", 1f to "Default", 1.1f to "Large
 @Composable
 internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var dialog by remember { mutableStateOf(LookDialog.NONE) }
     val close = { dialog = LookDialog.NONE }
     val pickWallpaper = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {
+            scope.launch {
+                val imported = withContext(Dispatchers.IO) { importWallpaper(context, uri) }
+                if (imported != null) update { it.copy(wallpaperUri = imported.toString()) }
             }
-            update { it.copy(wallpaperUri = uri.toString()) }
         }
     }
 
@@ -350,7 +354,10 @@ internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
             SettingRow(
                 "Remove wallpaper",
                 subtitle = "Back to the plain black or white background.",
-                onClick = { update { it.copy(wallpaperUri = "") } },
+                onClick = {
+                    deleteImportedWallpaper(context)
+                    update { it.copy(wallpaperUri = "") }
+                },
             )
         }
 
@@ -371,6 +378,31 @@ internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
         LookDialog.LAUNCH -> ChoiceDialog("Opening apps", LaunchAnimation.entries.map { it to it.label }, settings.launchAnimation, close) { v -> update { it.copy(launchAnimation = v) } }
         LookDialog.SIZE -> ChoiceDialog("Text size", TEXT_SIZES, settings.textScale, close) { v -> update { it.copy(textScale = v) } }
     }
+}
+
+private const val WALLPAPER_FILE = "imported-wallpaper"
+
+private fun importWallpaper(context: android.content.Context, source: android.net.Uri): android.net.Uri? {
+    val temporary = File(context.filesDir, "$WALLPAPER_FILE.tmp")
+    val destination = File(context.filesDir, WALLPAPER_FILE)
+    return try {
+        context.contentResolver.openInputStream(source)?.use { input ->
+            temporary.outputStream().use { output -> input.copyTo(output) }
+        } ?: return null
+        destination.delete()
+        if (!temporary.renameTo(destination)) {
+            temporary.delete()
+            return null
+        }
+        android.net.Uri.fromFile(destination)
+    } catch (_: Exception) {
+        temporary.delete()
+        null
+    }
+}
+
+private fun deleteImportedWallpaper(context: android.content.Context) {
+    File(context.filesDir, WALLPAPER_FILE).delete()
 }
 
 // ---- Gestures --------------------------------------------------------------------------------
