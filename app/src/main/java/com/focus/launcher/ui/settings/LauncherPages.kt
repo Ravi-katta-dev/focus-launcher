@@ -2,6 +2,7 @@ package com.focus.launcher.ui.settings
 
 import com.focus.launcher.ui.home.MusicAppPicker
 import android.Manifest
+import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -321,14 +322,37 @@ private val TEXT_SIZES = listOf(0.9f to "Small", 1f to "Default", 1.1f to "Large
 
 @Composable
 internal fun AppearancePage(settings: Settings, onBack: () -> Unit) {
+    val context = LocalContext.current
     var dialog by remember { mutableStateOf(LookDialog.NONE) }
     val close = { dialog = LookDialog.NONE }
+    val pickWallpaper = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {
+            }
+            update { it.copy(wallpaperUri = uri.toString()) }
+        }
+    }
 
     Page("Appearance", onBack) {
         Section("Black and white")
         SettingRow("Theme", subtitle = "Pure black saves battery on OLED screens.", value = if (settings.dark) "Black" else "White", onClick = { dialog = LookDialog.THEME })
         SettingRow("Typeface", value = settings.font.label, onClick = { dialog = LookDialog.FONT })
         SettingRow("Text size", value = TEXT_SIZES.firstOrNull { it.first == settings.textScale }?.second ?: "Default", onClick = { dialog = LookDialog.SIZE })
+        SettingRow(
+            "Wallpaper",
+            subtitle = "Import an image from system files.",
+            value = if (settings.wallpaperUri.isBlank()) "None" else "Imported",
+            onClick = { pickWallpaper.launch(arrayOf("image/*")) },
+        )
+        if (settings.wallpaperUri.isNotBlank()) {
+            SettingRow(
+                "Remove wallpaper",
+                subtitle = "Back to the plain black or white background.",
+                onClick = { update { it.copy(wallpaperUri = "") } },
+            )
+        }
 
         Section("Screen")
         SettingRow(

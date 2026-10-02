@@ -4,8 +4,8 @@
 
 [![Focus: a minimalist launcher for Android](docs/banner.png)](https://how2me.me/focusapp/)
 
-Focus is a minimalist launcher for Android: a text-only home screen built to be looked at as
-little as possible. No icons, no colour: black and white, the time, up to five apps you chose,
+Focus is a minimalist launcher for Android: a low-distraction home screen built to be looked at as
+little as possible. Minimal icons, no colour feed: black and white, the time, up to five apps you chose,
 and an honest picture of where the day went. It locks social apps and games when their daily time
 is up, and once a week it shows you the week you actually had.
 
@@ -54,9 +54,10 @@ Built with Kotlin and Jetpack Compose, without the Material library, in about 6,
   switched off in Settings → Gestures.
 
 **App drawer** (page 2)
-- Search bar, "installed in the last 24 hours", then every app alphabetically with an A–Z scrubber.
-- "Sort" under the search bar reorders the list: A–Z, most used, or most recently used (last 7
-  days, from Android's own usage totals). The scrubber only shows for A–Z.
+- Search bar, "installed in the last 24 hours", then apps shown as a compact grid with one built-in
+  minimal icon style.
+- "Sort" under the search bar reorders the grid: A–Z, most used, or most recently used (last 7
+  days, from Android's own usage totals).
 - With an Android Work profile the list splits into **Personal** and **Work** tabs. Search always
   looks through both. Usage inside a Work profile is invisible to apps, so the Work tab stays
   alphabetical.
@@ -279,7 +280,7 @@ matters more than anything else. Measured on a OnePlus (Android 16), release bui
   `Displayed … +NNNms`, which is the opened app's own start-up time.
 - **Swipes fade with `CompositingStrategy.ModulateAlpha`**, not through a full-screen off-screen
   buffer per page per frame.
-- **Memory:** no icons, no images, no Material library, no database; settings and day files are
+- **Memory:** no image-heavy UI, no Material library, no database; settings and day files are
   small JSON. The app's own Java heap is 6-10 MB. Total PSS reads anywhere from ~55 MB (settled)
   to ~95 MB (seconds after a cold start, when every code page has just been touched); most of it
   is runtime, framework and GPU-driver code shared with other apps, not data this app holds.

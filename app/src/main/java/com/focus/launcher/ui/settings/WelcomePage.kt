@@ -33,7 +33,7 @@ internal fun WelcomePage(onDone: (toSetup: Boolean) -> Unit) {
         VSpace(10.dp)
         T("Reclaim your time.\nSpend it touching some grass.", size = 20.sp, lineHeight = 28.sp)
         VSpace(22.dp)
-        T("No icons. No colour. No feed.\nTips on the home screen show you around.", size = 15.sp, color = c.dim, lineHeight = 23.sp)
+        T("Minimal icons. No colour feed.\nTips on the home screen show you around.", size = 15.sp, color = c.dim, lineHeight = 23.sp)
         VSpace(72.dp)
         FocusButton("Start", Modifier.fillMaxWidth(), primary = true) { onDone(false) }
         VSpace(12.dp)

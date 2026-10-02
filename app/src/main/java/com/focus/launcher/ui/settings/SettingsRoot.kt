@@ -187,7 +187,7 @@ private fun AboutPage(onBack: () -> Unit, go: (String) -> Unit) {
             T("Focus ${BuildConfig.VERSION_NAME}", size = 20.sp, weight = FontWeight.Medium)
             VSpace(12.dp)
             T(
-                "A launcher with nothing to look at. No icons, no colour, no feed: the time, the few apps you " +
+                "A launcher with little to look at. Minimal icons, no colour feed: the time, the few apps you " +
                     "chose, and an honest picture of where your day is going.",
                 size = 16.sp, lineHeight = 24.sp,
             )

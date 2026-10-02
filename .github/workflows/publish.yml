@@ -43,7 +43,7 @@ env:
 jobs:
   publish:
     name: Sign, publish to the site and the release page
-    if: github.ref == 'refs/heads/main' && vars.FOCUS_PUBLISHING == 'on'
+    if: github.ref == 'refs/heads/main' && vars.FOCUS_PUBLISHING == 'on' && github.actor == 'wkwkeke'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment:
